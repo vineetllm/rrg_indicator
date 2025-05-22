@@ -349,6 +349,64 @@ def color_negative_red(val):
 styled_df = df.style.map(color_negative_red, subset=['Change (%)'])
 st.dataframe(styled_df, use_container_width=True)
 
+# --- AI Assistant -----------------------------------------------------------
+
+def ask_ai(question: str, data: pd.DataFrame) -> str:
+    """Return an answer to *question* using the provided *data*.
+
+    If an OpenAI API key is available via ``st.secrets`` or the
+    ``OPENAI_API_KEY`` environment variable, the request is sent to the
+    ``gpt-3.5-turbo`` model with a short description of the data. If the key
+    isn't configured or the request fails, a simple rule‑based response is
+    generated instead.
+    """
+
+    # Basic description of the table for context
+    head_csv = data.head().to_csv(index=False)
+
+    try:
+        import openai, os
+
+        api_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OpenAI API key not configured")
+        openai.api_key = api_key
+
+        user_prompt = (
+            "You are a helpful assistant for a Relative Rotation Graph app. "
+            "Answer the user's question using the data table provided. "
+            "The table preview is:\n" + head_csv + "\nQuestion: " + question
+        )
+
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": user_prompt}],
+            max_tokens=200,
+        )
+        return response.choices[0].message.content.strip()
+
+    except Exception:
+        # Fallback: very simple rule based answers for prices and change
+        q = question.lower()
+        for ticker in tickers:
+            if ticker.lower() in q:
+                row = data[data["Symbol"] == ticker]
+                if row.empty:
+                    continue
+                price = row["Price"].iloc[0]
+                change = row["Change (%)"].iloc[0]
+                if "price" in q:
+                    return f"The latest price of {ticker} is {price}."
+                if "change" in q or "percentage" in q:
+                    return f"{ticker} changed {change}% over the period."
+        return "Sorry, I couldn't understand the question."
+
+
+st.sidebar.subheader("🤖 AI Assistant")
+query = st.sidebar.text_input("Ask about the data", key="ai_query")
+if st.sidebar.button("Get Answer", key="ai_button") and query:
+    st.sidebar.write(ask_ai(query, df))
+
 # Auto-rerun when playing
 if st.session_state.playing:
     speed_delays = {'Slow': 1.0, 'Normal': 0.7, 'Fast': 0.3}

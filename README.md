@@ -17,3 +17,10 @@ A simple Streamlit app template for you to modify!
    ```
    $ streamlit run streamlit_app.py
    ```
+
+### Using the AI assistant
+
+If you set the `OPENAI_API_KEY` environment variable, the sidebar includes an
+**AI Assistant** section where you can ask natural‑language questions about the
+displayed data. Without an API key the assistant falls back to simple
+rule‑based answers.
